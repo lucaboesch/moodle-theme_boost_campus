@@ -60,4 +60,49 @@ class behat_theme_boost_campus_behat_navigation extends behat_navigation {
         }
         return $menuxpath;
     }
+
+    /**
+     * Finds a page edit cog and select an item from it
+     *
+     * If the page edit cog is in the page header and the item is not found there, click "More..." link
+     * and find the item on the course/frontpage administration page
+     *
+     * @param array $nodelist
+     * @throws ElementNotFoundException
+     */
+    protected function select_from_administration_menu($nodelist) {
+        // Find administration menu.
+        if ($menuxpath = $this->find_header_administration_menu()) {
+            $isheader = true;
+        } else {
+            $menuxpath = $this->find_page_administration_menu(true);
+            $isheader = false;
+        }
+
+        $this->execute('behat_navigation::toggle_page_administration_menu', [$menuxpath]);
+
+        if (!$isheader || count($nodelist) >= 1) {
+            $lastnode = end($nodelist);
+            $linkname = behat_context_helper::escape($lastnode);
+            $link = $this->getSession()->getPage()->find('xpath', $menuxpath . '//a[contains(normalize-space(.), ' . $linkname . ')]');
+            if ($link) {
+                $this->execute('behat_general::i_click_on', [$link, 'NodeElement']);
+                return;
+            }
+        }
+
+        if ($isheader) {
+            // Course administration and Front page administration will have subnodes under "More...".
+            $linkname = behat_context_helper::escape(get_string('morenavigationlinks'));
+            $link = $this->getSession()->getPage()->find('xpath', $menuxpath . '//a[contains(normalize-space(.), ' . $linkname . ')]');
+            if ($link) {
+                $this->execute('behat_general::i_click_on', [$link, 'NodeElement']);
+                $this->select_on_administration_page($nodelist);
+                return;
+            }
+        }
+
+        throw new ElementNotFoundException($this->getSession(),
+            'Link "' . join(' > ', $nodelist) . '" in the current page edit menu"');
+    }
 }
